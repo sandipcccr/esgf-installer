@@ -28,6 +28,7 @@ import esg_property_manager
 import esg_version_manager
 import esg_postgres
 from esg_tomcat_manager import stop_tomcat
+from urlparse import urljoin
 
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
@@ -335,7 +336,16 @@ def setup_py_pkgs():
 
 
 def fetch_shell_launcher():
-    pass
+    ''' Download the esgf_shell_launcher script '''
+    with esg_bash2py.pushd(config.config_dictionary["scripts_dir"]):
+        node_dist_url_root = esg_bash2py.trim_string_from_head(node_dist_url)
+        esgf_shell_launcher_url = urljoin(node_dist_url_root, "esgf_shell_launcher")
+        logger.debug("esgf_shell_launcher_url: %s", esgf_shell_launcher_url)
+        if not esg_functions.download_update(esgf_shell_launcher, esgf_shell_launcher_url, force_install):
+            logger.error("Could not download: %s", esgf_shell_launcher_url)
+            return False
+        os.chmod(esgf_shell_launcher, 0755)
+    return True
 
 
 def write_shell_contrib_command_file():
