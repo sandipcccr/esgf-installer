@@ -347,7 +347,32 @@ def write_node_manager_install_log():
 
 
 def touch_generated_whitelist_files():
-    pass
+    '''Create whitlisted xml files '''
+
+    whitelist_files = []
+
+    logger.debug("touch_generated_whitelist_files....")
+
+    tomcat_user_id = pwd.getpwnam(config.config_dictionary["tomcat_user"]).pw_uid
+    tomcat_group_id = grp.getgrnam(config.config_dictionary["tomcat_group"]).gr_gid
+
+    esgf_ats_xml_file = os.path.join(config.config_dictionary["esg_config_dir"], "esgf_ats.xml")
+    whitelist_files.append(esgf_ats_xml_file)
+    esgf_atz_xml_file = os.path.join(config.config_dictionary["esg_config_dir"], "esgf_atz.xml")
+    whitelist_files.append(esgf_atz_xml_file)
+    esgf_idp_xml_file = os.path.join(config.config_dictionary["esg_config_dir"], "esgf_idp.xml")
+    whitelist_files.append(esgf_idp_xml_file)
+    esgf_shards_xml_file = os.path.join(config.config_dictionary["esg_config_dir"], "esgf_shards.xml")
+    whitelist_files.append(esgf_shards_xml_file)
+    las_server_conf_directory = os.path.join(config.esg_root_dir, "content", "las", "conf", "server")
+    if os.path.isdir(las_server_conf_directory):
+        las_servers_xml = os.path.join(las_server_conf_directory, "las_servers.xml")
+        whitelist_files.append(las_servers_xml)
+
+    for whitelist_file in whitelist_files:
+        esg_bash2py.touch(whitelist_file)
+        os.chown(whitelist_file, tomcat_user_id, tomcat_group_id)
+        os.chmod(whitelist_file, 0644)
 
 
 def configure_postgress():
