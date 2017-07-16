@@ -354,7 +354,36 @@ def fetch_shell_launcher():
 
 
 def write_shell_contrib_command_file():
-    pass
+    '''Write out to the esgf_contrib_commands file '''
+
+    contrib_file = os.path.join(config.esg_root_dir, "config", "esgf_contrib_commands")
+    if os.path.isfile(contrib_file):
+        print "found esgf_contrib_commands file"
+        return True
+
+    esg_root_config_dir = os.path.join(config.esg_root_dir, "config")
+    esg_bash2py.mkdir_p(esg_root_config_dir)
+    with esg_bash2py.pushd(esg_root_config_dir):
+        with open(contrib_file, "w+") as contrib_file_handle:
+            contrib_file_handle.write('''This file contains the mappings of contributed shell commands that
+            are to be loaded into the esgf-sh shell
+            Entries are of the form:
+
+            [implmentation_language]
+            command1 -> resource1
+            command2 = resource2
+
+            Depending on the resource value specifies the resource to load given
+            the implementation language specified.  For example for commands
+            implemented in Java the resource is the fully qualified class name of
+            the implementing class.
+
+            [java]
+            test -> esg.common.shell.cmds.ESGFtest ''')
+        os.chmod(config.config_dictionary["config_file"], 0644)
+
+    return True
+
 
 
 def write_node_manager_install_log():
