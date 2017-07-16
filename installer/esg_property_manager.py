@@ -2,6 +2,7 @@
 Property reading and writing...
 '''
 import os
+import sys
 import re
 import logging
 from esg_init import EsgInit
@@ -10,15 +11,38 @@ logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 config = EsgInit()
 
+
+def deduplicate_properties_file(properties_file = config.config_dictionary["config_file"]):
+    ''' Remove duplicate entries from the esgf.properties file '''
+    try:
+        my_set = set()
+        deduplicated_list = []
+        with open(properties_file, 'r+') as prop_file:
+            property_settings = prop_file.readlines()
+            for prop in reversed(property_settings):
+                if not prop.isspace():
+                    key, value = prop.split("=")
+                if key not in my_set:
+                    deduplicated_list.append(key+ "=" + value)
+                    my_set.add(key)
+            deduplicated_list.reverse()
+            prop_file.seek(0)
+            for setting in deduplicated_list:
+                prop_file.write(setting)
+            prop_file.truncate()
+    except IOError, error:
+        logger.error(error)
+        sys.exit(0)
+
 def load_properties(property_file = config.config_dictionary["config_file"]):
     '''
         Load properties from a java-style property file
         providing them as script variables in this context
-        arg 1 - optional property file (default is ${config_file})
+        property_file - optional property file (default file is esgf.properties)
     '''
     if not os.access(property_file, os.R_OK):
         return False
-    deduplicate_properties(property_file)
+    deduplicate_properties_file(property_file)
     separator = "="
     count = 0
     with open(property_file) as f:
