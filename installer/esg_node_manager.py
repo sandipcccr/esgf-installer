@@ -27,7 +27,7 @@ import esg_bootstrap
 import esg_env_manager
 import esg_property_manager
 import esg_version_manager
-import esg_postgres
+from esg_postgres import start_postgress
 from esg_tomcat_manager import stop_tomcat
 from urlparse import urljoin
 
@@ -427,6 +427,17 @@ def touch_generated_whitelist_files():
 
 
 def configure_postgress():
+    init()
+
+    print
+    print "*******************************"
+    print "Configuring Postgres... for ESGF Node Manager"
+    print "*******************************"
+    print
+
+    start_postgress()
+
+
     pass
 
 def write_node_manager_db_install_log():
