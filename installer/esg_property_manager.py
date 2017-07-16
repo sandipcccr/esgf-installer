@@ -83,12 +83,15 @@ def remove_property(key):
     return property_found
 
 
-def write_as_property(property_name, property_value):
+def add_to_property_file(property_name, property_value):
     '''
-        Writes variable out to property file as java-stye property
+        Writes variable out to the esgf.properties file as java-stye property
         I am replacing all bash-style "_"s with java-style "."s
-        arg 1 - The string of the variable you wish to write as property to property file
-        arg 2 - The value to set the variable to (default: the value of arg1)
+
+        property_name - The string of the variable you wish to write as property to property file
+        property_value - The value to set the variable to (default: the value of arg1)
+
+        Values gets written to the file in the following format: properlty.name=property_value
     '''
     datafile = open(config.config_dictionary["config_file"], "a+")
     searchlines = datafile.readlines()
@@ -96,7 +99,9 @@ def write_as_property(property_name, property_value):
     for line in searchlines:
         if property_name in line:
             print "Property already exists"
-            return "Property already exists"
+            return
     else:
+        #replace underscores with periods
+        property_name = property_name.replace("_", ".")
         datafile.write(property_name+"="+property_value+"\n")
-        return 0
+        return True

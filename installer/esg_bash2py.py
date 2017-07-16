@@ -87,7 +87,7 @@ def GetValue(name, local=locals()):
 def Array(value):
     '''
       if value is a List object, return the List; if value is plain String or Unicode String, convert to List;
-      otherwise convert the value to a List 
+      otherwise convert the value to a List
     '''
     if isinstance(value, list):
         return value
@@ -159,7 +159,7 @@ class Expand(object):
       return value
 
 def touch(path):
-    ''' 
+    '''
         Mimics Bash's touch command
     '''
     with open(path, 'a'):
@@ -181,9 +181,7 @@ def trim_string_from_head(string_name):
 
                 output -> esg_installarg_file
     '''
-    #TODO: Might refactor to use this: config.config_dictionary["tomcat_dist_url"].rsplit("/",1)[-1]
-    # string_regex = r"\w*-*\w+$" 
-    # return re.search(string_regex, string_name).group()
+    #TODO: pass in argument for second value of rsplit
     return string_name.rsplit("/",1)[-1]
 
 def trim_string_from_tail(string_name):

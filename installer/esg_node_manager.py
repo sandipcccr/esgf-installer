@@ -62,34 +62,34 @@ def init():
         esgf_node_manager_db_version=config.config_dictionary["esgf_node_manager_db_version"], python_version=config.config_dictionary["python_version"])
 
 
-    # get_property node_use_ssl && [ -z "${node_use_ssl}" ] && write_as_property node_use_ssl true
+    # get_property node_use_ssl && [ -z "${node_use_ssl}" ] && add_to_property_file node_use_ssl true
     node_use_ssl = esg_property_manager.get_property("node_use_ssl")
-    esg_property_manager.write_as_property("node_use_ssl", True)
+    esg_property_manager.add_to_property_file("node_use_ssl", True)
 
     # get_property node_manager_service_app_home ${tomcat_install_dir}/webapps/${node_manager_app_context_root}
-    # write_as_property node_manager_service_app_home
+    # add_to_property_file node_manager_service_app_home
     node_manager_service_app_home = esg_property_manager.get_property("node_manager_service_app_home", "{tomcat_install_dir}/webapps/{node_manager_app_context_root}".format(
         tomcat_install_dir=config.config_dictionary["tomcat_install_dir"], node_manager_app_context_root=node_manager_app_context_root))
-    esg_property_manager.write_as_property(
+    esg_property_manager.add_to_property_file(
         "node_manager_service_app_home", node_manager_service_app_home)
 
-    # write_as_property node_manager_service_endpoint "http$([ "${node_use_ssl}" = "true" ] && echo "s" || echo "")://${esgf_host}/${node_manager_app_context_root}/node"
+    # add_to_property_file node_manager_service_endpoint "http$([ "${node_use_ssl}" = "true" ] && echo "s" || echo "")://${esgf_host}/${node_manager_app_context_root}/node"
     if node_use_ssl:
         node_manager_service_endpoint = "https://{esgf_host}/{node_manager_app_context_root}/node".format(
             esgf_host=esgf_host, node_manager_app_context_root=node_manager_app_context_root)
     else:
         node_manager_service_endpoint = "http://{esgf_host}/{node_manager_app_context_root}/node".format(
             esgf_host=esgf_host, node_manager_app_context_root=node_manager_app_context_root)
-    esg_property_manager.write_as_property(
+    esg_property_manager.add_to_property_file(
         "node_manager_service_endpoint", node_manager_service_endpoint)
 
-    # get_property node_use_ips && [ -z "${node_use_ips}" ] && write_as_property node_use_ips true
+    # get_property node_use_ips && [ -z "${node_use_ips}" ] && add_to_property_file node_use_ips true
     node_use_ips = esg_property_manager.get_property("node_use_ips")
-    esg_property_manager.write_as_property("node_use_ips", True)
+    esg_property_manager.add_to_property_file("node_use_ips", True)
 
-    # get_property node_poke_timeout && [ -z "${node_poke_timeout}" ] && write_as_property node_poke_timeout 6000
+    # get_property node_poke_timeout && [ -z "${node_poke_timeout}" ] && add_to_property_file node_poke_timeout 6000
     node_poke_timeout = esg_property_manager.get_property("node_poke_timeout")
-    esg_property_manager.write_as_property("node_poke_timeout", 6000)
+    esg_property_manager.add_to_property_file("node_poke_timeout", 6000)
 
     # Database information....
     node_db_node_manager_schema_name = "esgf_node_manager"
@@ -390,6 +390,36 @@ def configure_postgress():
 
 
 def write_node_manager_config():
+    ''' #----------------------------
+((DEBUG || VERBOSE)) && echo "Writing down database connection info and other node-wide properties"
+#----------------------------
+mkdir -p ${esg_root_dir}/config
+pushd ${esg_root_dir}/config >& /dev/null
+[ $? != 0 ] && return 1
+
+cat >> ${config_file} <<EOF
+db.driver=${postgress_driver}
+db.protocol=${postgress_protocol}
+db.host=${postgress_host}
+db.port=${postgress_port}
+db.database=${node_db_name}
+db.user=${postgress_user}
+mail.smtp.host=${mail_smtp_host}
+mail.admin.address=${mail_admin_address}
+EOF
+[ $? != 0 ] && popd >& /dev/null && return 1
+
+dedup_properties ${config_file}
+chown ${tomcat_user}:${tomcat_group} ${config_file}
+chmod 600 ${config_file}
+popd >& /dev/null
+#----------------------------
+return 0 '''
+logger.debug("Writing down database connection info and other node-wide properties")
+logger.info("Writing down database connection info and other node-wide properties")
+
+with esg_bash2py.pushd(config.esg_config_dir):
+
     pass
 
 #--------------------------------------

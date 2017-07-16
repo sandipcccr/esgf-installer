@@ -293,7 +293,7 @@ def check_for_my_ip(force_install=False):
         else:
             my_ip_address = ip_addresses[0]
 
-    esg_property_manager.write_as_property("esgf_host_ip", my_ip_address)
+    esg_property_manager.add_to_property_file("esgf_host_ip", my_ip_address)
     esgf_host_ip = esg_property_manager.get_property("esgf_host_ip")
     return esgf_host_ip
 
@@ -313,10 +313,10 @@ def _choose_fqdn(esgf_host):
             default_host_name=default_host_name)) or default_host_name
         esgf_host = default_host_name
         logger.info("esgf_host = [%s]", esgf_host)
-        esg_property_manager.write_as_property("esgf_host", esgf_host)
+        esg_property_manager.add_to_property_file("esgf_host", esgf_host)
     else:
         logger.info("esgf_host = [%s]", esgf_host)
-        esg_property_manager.write_as_property("esgf_host", esgf_host)
+        esg_property_manager.add_to_property_file("esgf_host", esgf_host)
 
 
 def _is_valid_password(password_input):
@@ -443,7 +443,7 @@ def _choose_organization_name():
             org_name_input = raw_input("What is the name of your organization? [{default_org_name}]: ", format(
                 default_org_name=default_org_name)) or default_org_name
             org_name_input.replace("", "_")
-            esg_property_manager.write_as_property("esg_root_id", esg_root_id)
+            esg_property_manager.add_to_property_file("esg_root_id", esg_root_id)
             break
     else:
         logger.info("esg_root_id = [%s]", esg_root_id)
@@ -456,7 +456,7 @@ def _choose_node_short_name():
             node_short_name_input = raw_input("Please give this node a \"short\" name [{node_short_name}]: ".format(
                 node_short_name=node_short_name)) or node_short_name
             node_short_name_input.replace("", "_")
-            esg_property_manager.write_as_property(
+            esg_property_manager.add_to_property_file(
                 "node_short_name", node_short_name_input)
             break
     else:
@@ -469,7 +469,7 @@ def _choose_node_long_name():
         while True:
             node_long_name_input = raw_input("Please give this node a more descriptive \"long\" name [{node_long_name}]: ".format(
                 node_long_name=node_long_name)) or node_long_name
-            esg_property_manager.write_as_property(
+            esg_property_manager.add_to_property_file(
                 "node_long_name", node_long_name_input)
             break
     else:
@@ -492,7 +492,7 @@ def _choose_node_namespace():
                 print "Namespace entered is not in a valid format.  Valid format is [suffix].[domain].  Example: gov.llnl"
                 continue
             else:
-                esg_property_manager.write_as_property(
+                esg_property_manager.add_to_property_file(
                     "node_namespace", node_namespace_input)
                 break
     else:
@@ -514,7 +514,7 @@ def _choose_node_peer_group():
                 print "Please choose either esgf-test or esgf-prod"
                 continue
             else:
-                esg_property_manager.write_as_property(
+                esg_property_manager.add_to_property_file(
                     "node_peer_group", node_peer_group_input)
                 break
     else:
@@ -531,7 +531,7 @@ def _choose_esgf_default_peer():
 
         esgf_default_peer_input = raw_input("What is the default peer to this node? [{default_esgf_default_peer}]: ".format(
             default_esgf_default_peer=default_esgf_default_peer)) or default_esgf_default_peer
-        esg_property_manager.write_as_property(
+        esg_property_manager.add_to_property_file(
             "esgf_default_peer", esgf_default_peer_input)
     else:
         logger.info("esgf_default_peer = [%s]", esgf_default_peer)
@@ -545,7 +545,7 @@ def _choose_esgf_index_peer():
         default_esgf_index_peer = esgf_default_peer or esgf_host or socket.getfqdn()
         esgf_index_peer_input = raw_input("What is the hostname of the node do you plan to publish to? [{default_esgf_index_peer}]: ".format(
             default_esgf_index_peer=default_esgf_index_peer)) or default_esgf_index_peer
-        esg_property_manager.write_as_property(
+        esg_property_manager.add_to_property_file(
             "esgf_index_peer", esgf_index_peer_input)
     else:
         logger.info("esgf_index_peer = [%s]", esgf_index_peer)
@@ -557,7 +557,7 @@ def _choose_mail_admin_address():
         mail_admin_address_input = raw_input(
             "What email address should notifications be sent as? [{mail_admin_address}]: ".format(mail_admin_address=mail_admin_address))
         if mail_admin_address_input:
-            esg_property_manager.write_as_property(
+            esg_property_manager.add_to_property_file(
                 "mail_admin_address", mail_admin_address_input)
         else:
             print " (The notification system will not be enabled without an email address)"
@@ -572,7 +572,7 @@ def _choose_publisher_db_user():
         default_publisher_db_user = publisher_db_user or "esgcet"
         publisher_db_user_input = raw_input(
             "What is the (low priv) db account for publisher? [${default}]: ") or default_publisher_db_user
-        esg_property_manager.write_as_property(
+        esg_property_manager.add_to_property_file(
             "publisher_db_user", publisher_db_user_input)
     else:
         logger.info("publisher_db_user: %s", publisher_db_user)
@@ -720,10 +720,10 @@ def _get_db_conn_str_questionnaire(db_properties):
     logger.debug("database = %s", dbname_)
 
     # write vars to property file
-    esg_property_manager.write_as_property("db_user", user_)
-    esg_property_manager.write_as_property("db_host", host_)
-    esg_property_manager.write_as_property("db_port", port_)
-    esg_property_manager.write_as_property("db_database", dbname_)
+    esg_property_manager.add_to_property_file("db_user", user_)
+    esg_property_manager.add_to_property_file("db_host", host_)
+    esg_property_manager.add_to_property_file("db_port", port_)
+    esg_property_manager.add_to_property_file("db_database", dbname_)
 
     logger.debug("valid_connection_string: %s",  valid_connection_string)
     return valid_connection_string
@@ -766,13 +766,13 @@ def _is_managed_db(db_properties):
             "Is the database external to this node? " + default_selection_output)
         if not external_db_input:
             db_managed = db_managed_default
-            esg_property_manager.write_as_property("db_managed", db_managed)
+            esg_property_manager.add_to_property_file("db_managed", db_managed)
         else:
             if external_db_input.lower() == "y" or external_db_input.lower() == "yes":
                 db_managed == "yes"
             else:
                 db_managed == "no"
-            esg_property_manager.write_as_property("db_managed", db_managed)
+            esg_property_manager.add_to_property_file("db_managed", db_managed)
     else:
         logger.info("db_managed = [%s]", db_managed)
 
@@ -794,7 +794,7 @@ def install_prerequisites():
     print '''
     *******************************
     Installing prerequisites
-    ******************************* 
+    *******************************
     '''
     yum_remove_rpm_forge = subprocess.Popen(
         ["yum", "-y", "remove", "rpmforge-release"], stdout=subprocess.PIPE)

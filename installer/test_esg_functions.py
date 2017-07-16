@@ -13,7 +13,7 @@ class test_ESG_Functions(unittest.TestCase):
 
     # @classmethod
     # def setUpClass(self):
-        # try: 
+        # try:
         #     os.makedirs("/esg/esgf-install-manifest")
         # except OSError:
         #     if not os.path.isdir("/esg/esgf-install-manifest"):
@@ -186,8 +186,8 @@ class test_ESG_Functions(unittest.TestCase):
         output = esg_functions.remove_property("non.existant")
         self.assertEqual(output, False)
 
-    def test_write_as_property(self):
-        output = esg_functions.write_as_property("new.property", "new_value")
+    def test_add_to_property_file(self):
+        output = esg_functions.add_to_property_file("new.property", "new_value")
         self.assertEqual(output, 0)
 
         find_value = esg_functions.get_property("new.property")
