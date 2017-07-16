@@ -670,8 +670,7 @@ def initial_setup_questionnaire():
         logger.info("db publisher connection string %s@%s:%s/%s",
                     db_properties["db_user"], db_properties["db_host"], db_properties["db_port"], db_properties["db_database"])
 
-    esg_env_manager.deduplicate_properties(
-        config.config_dictionary["config_file"])
+    esg_property_manager.deduplicate_properties_file()
 
     os.chdir(starting_directory)
 
