@@ -90,7 +90,8 @@ def get_property_as():
 
 def remove_property(key):
     '''
-        Removes a given variable's property representation from the property file
+        Removes a given variable's property representation from the esgf.properties file
+        key - a key to be removed from the property file
     '''
     print "removing %s's property from %s" % (key, config.config_dictionary["config_file"])
     property_found = False
