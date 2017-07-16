@@ -17,6 +17,7 @@ import urlparse
 import glob
 import pwd
 from time import sleep
+import datetime
 from esg_init import EsgInit
 # import esg_init as config
 from esg_exceptions import UnprivilegedUserError, WrongOSError, UnverifiedScriptError
@@ -357,7 +358,14 @@ def write_shell_contrib_command_file():
 
 
 def write_node_manager_install_log():
-    pass
+    ''' Log out to the install manifest file, i.e esgf-install-manifest '''
+    with open(config.install_manifest, "a") as manifest_file:
+        date_string = str(datetime.date.today())
+        log_entry = "{date} webapp:esgf-node-manager={esgf_node_manager_version} {node_manager_service_app_home}".format(date=date_string, esgf_node_manager_version=esgf_node_manager_version, node_manager_service_app_home=node_manager_service_app_home)
+        manifest_file.write(log_entry)
+
+    esg_env_manager.deduplicate_settings_in_file(config.install_manifest)
+    return True
 
 
 def touch_generated_whitelist_files():
