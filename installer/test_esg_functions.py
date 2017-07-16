@@ -138,13 +138,13 @@ class test_ESG_Functions(unittest.TestCase):
         output = esg_functions.deduplicate_settings_in_file()
         self.assertEqual(output, 0)
 
-    def test_deduplicate_properties(self):
+    def test_deduplicate_properties_file(self):
         target = open(self.test.config_dictionary["config_file"], 'a')
         target.write("test.property=first\n")
         target.write("test.property=second\n")
         target.close()
 
-        output = esg_functions.deduplicate_properties()
+        output = esg_functions.deduplicate_properties_file()
         self.assertEqual(output, 0)
 
     def test_check_postgress_process(self):
