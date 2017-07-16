@@ -36,6 +36,10 @@ config = EsgInit()
 
 envfile = "/etc/esg.env"
 
+#TODO: Maybe move these to esg_init
+TOMCAT_USER_ID = pwd.getpwnam(config.config_dictionary["tomcat_user"]).pw_uid
+TOMCAT_GROUP_ID = grp.getgrnam(config.config_dictionary["tomcat_group"]).gr_gid
+
 #--------------
 # User Defined / Settable (public)
 #--------------
@@ -390,37 +394,26 @@ def configure_postgress():
 
 
 def write_node_manager_config():
-    ''' #----------------------------
-((DEBUG || VERBOSE)) && echo "Writing down database connection info and other node-wide properties"
-#----------------------------
-mkdir -p ${esg_root_dir}/config
-pushd ${esg_root_dir}/config >& /dev/null
-[ $? != 0 ] && return 1
+    ''' Write Node Manger configuration settings to esgf.properties file '''
+    logger.debug("Writing down database connection info and other node-wide properties")
+    logger.info("Writing down database connection info and other node-wide properties")
 
-cat >> ${config_file} <<EOF
-db.driver=${postgress_driver}
-db.protocol=${postgress_protocol}
-db.host=${postgress_host}
-db.port=${postgress_port}
-db.database=${node_db_name}
-db.user=${postgress_user}
-mail.smtp.host=${mail_smtp_host}
-mail.admin.address=${mail_admin_address}
-EOF
-[ $? != 0 ] && popd >& /dev/null && return 1
+    #TODO: No real reason to change to the config directory since I'm using absolute path
+    with esg_bash2py.pushd(config.esg_config_dir):
+        esg_property_manager.add_to_property_file("db.driver", config.config_dictionary["postgress_driver"])
+        esg_property_manager.add_to_property_file("db.protocol", config.config_dictionary["postgress_protocol"])
+        esg_property_manager.add_to_property_file("db.host", config.config_dictionary["postgress_host"])
+        esg_property_manager.add_to_property_file("db.port", config.config_dictionary["postgress_port"])
+        esg_property_manager.add_to_property_file("db.database", config.config_dictionary["node_db_name"])
+        esg_property_manager.add_to_property_file("db.user", config.config_dictionary["postgress_user"])
+        esg_property_manager.add_to_property_file("mail.smtp.host", config.config_dictionary["mail_smtp_host"])
+        esg_property_manager.add_to_property_file("mail.admin.address", config.config_dictionary["mail_admin_address"])
 
-dedup_properties ${config_file}
-chown ${tomcat_user}:${tomcat_group} ${config_file}
-chmod 600 ${config_file}
-popd >& /dev/null
-#----------------------------
-return 0 '''
-logger.debug("Writing down database connection info and other node-wide properties")
-logger.info("Writing down database connection info and other node-wide properties")
+        esg_property_manager.deduplicate_properties_file()
 
-with esg_bash2py.pushd(config.esg_config_dir):
-
-    pass
+        os.chown(config.config_dictionary["config_file"], TOMCAT_USER_ID, TOMCAT_GROUP_ID)
+        os.chmod(config.config_dictionary["config_file"], 0600)
+    return True
 
 #--------------------------------------
 # Clean / Uninstall this module...
