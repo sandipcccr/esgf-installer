@@ -466,4 +466,21 @@ def write_node_manager_config():
 
 
 def clean_node_manager_webapp_subsystem():
-    pass
+    init()
+
+    remove_nm_default_answer = "n"
+
+    if os.path.isdir(node_manager_service_app_home):
+        remove_nm_input = raw_input("remove ESG Node Manager web service? ({node_manager_service_app_home}) [y/N]: ".format(node_manager_service_app_home=node_manager_service_app_home))
+        if remove_nm_input.lower() == "y":
+            print "removing {node_manager_service_app_home}".format(node_manager_service_app_home)
+
+            try:
+                shutil.rmtree(node_manager_service_app_home)
+                esg_property_manager.remove_property(node_manager_service_app_home)
+                esg_property_manager.remove_property(node_manager_service_endpoint)
+            except Exception, error:
+                logger.error(error)
+                logger.error("Unable to remove %s", node_manager_service_app_home)
+
+            esg_functions.call_subprocess("perl -n -i -e'print unless m!webapp:esgf-node-manager!' {install_manifest}".format(install_manifest=config.install_manifest))
