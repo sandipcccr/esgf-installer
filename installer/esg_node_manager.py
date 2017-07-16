@@ -400,6 +400,14 @@ def touch_generated_whitelist_files():
 def configure_postgress():
     pass
 
+def write_node_manager_db_install_log():
+    with open(config.install_manifest, "a") as manifest_file:
+        date_string = str(datetime.date.today())
+        log_entry = "{date} python:esgf_node_manager={esgf_node_manager_db_version}".format(date=date_string, esgf_node_manager_db_version=esgf_node_manager_db_version)
+        manifest_file.write(log_entry)
+
+    esg_env_manager.deduplicate_settings_in_file(config.install_manifest)
+    return True
 
 def write_node_manager_config():
     ''' Write Node Manger configuration settings to esgf.properties file '''
