@@ -342,8 +342,21 @@ def postgres_list_dbs():
     # (PGPASSWORD=${PGPASSWORD:-${pg_sys_acct_passwd}} \
     # psql -lat -U ${postgress_user:-"dbsuper"} | cut -d' ' -f2 | \
     # grep -Ev "^(template[0-9]|postgres)$" | grep ${1:-"."})
-    list_dbs_commands = ["PGPASSWORD={pg_sys_acct_passwd}".format(pg_sys_acct_passwd=config["pg_sys_acct_passwd"]), "psql -lat -U dbsuper", "cut -d' ' -f2", 'grep -Ev "^(template[0-9]|postgres)$"']
-    esg_functions.subprocess_pipe_commands(list_dbs_commands)
+    # list_dbs_commands = ["PGPASSWORD={pg_sys_acct_passwd}".format(pg_sys_acct_passwd=config["pg_sys_acct_passwd"]), "psql -lat -U dbsuper", "cut -d' ' -f2", 'grep -Ev "^(template[0-9]|postgres)$"']
+    # esg_functions.subprocess_pipe_commands(list_dbs_commands)
+
+    try:
+        conn=psycopg2.connect("dbname='postgres' user='postgres' password={pg_sys_acct_passwd}".format(pg_sys_acct_passwd = config["pg_sys_acct_passwd"]))
+    except Exception, error:
+        logger.error(error)
+        print "I am unable to connect to the database."
+        esg_functions.exit_with_error(1)
+
+    cur = conn.cursor()
+    cur.execute("""SELECT datname from pg_database""")
+    print "\nShow me the databases:\n"
+    for row in rows:
+        print "   ", row[0]
 
 def postgres_clean_schema_migration():
     pass
