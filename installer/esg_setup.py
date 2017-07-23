@@ -357,8 +357,6 @@ def _update_admin_password_file(updated_password):
     # Use the same password when creating the postgress account
     config["pg_sys_acct_passwd"] = updated_password
 
-# TODO: move this function to esg_functions
-
 
 def _add_user_group(group_name):
     # TODO: Refactor by modifying the /etc/group and /etc/gshadow files; use
@@ -371,7 +369,6 @@ def _add_user_group(group_name):
     except subprocess.CalledProcessError as error:
         logger.error(error)
         print "ERROR: *Could not add tomcat system group: %s" % (config["tomcat_group"])
-        # os.chdir(starting_directory)
         esg_functions.exit_with_error(1)
 
 
