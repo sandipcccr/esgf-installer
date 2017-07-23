@@ -1,16 +1,15 @@
+#!/usr/local/bin/python2.7
+
 import glob
 import os
 import datetime
 import time
-import logging
 from pylint.lint import Run
 import pprint
 import esg_bash2py
-import sys
+import esg_logging_manager
 
-logging.basicConfig(
-    format="%(levelname): %(lineno)s %(funcName)s", level=logging.DEBUG)
-logger = logging.getLogger(__name__)
+logger = esg_logging_manager.create_rotating_log(__name__)
 
 # create folder pylint_score_reports
 esg_bash2py.mkdir_p("pylint_score_reports")
