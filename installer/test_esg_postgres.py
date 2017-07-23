@@ -21,6 +21,10 @@ class test_ESG_postgres(unittest.TestCase):
         self.assertEqual(output, 0)
 
 
+    def test_postgres_list_dbs(self):
+        esg_postgres.postgres_list_dbs()
+
+
 
 if __name__ == '__main__':
     unittest.main()
