@@ -339,7 +339,11 @@ def postgres_list_schemas_tables():
     pass
 
 def postgres_list_dbs():
-    pass
+    # (PGPASSWORD=${PGPASSWORD:-${pg_sys_acct_passwd}} \
+    # psql -lat -U ${postgress_user:-"dbsuper"} | cut -d' ' -f2 | \
+    # grep -Ev "^(template[0-9]|postgres)$" | grep ${1:-"."})
+    list_dbs_commands = ["PGPASSWORD={pg_sys_acct_passwd}".format(pg_sys_acct_passwd=config["pg_sys_acct_passwd"]), "psql -lat -U dbsuper", "cut -d' ' -f2", 'grep -Ev "^(template[0-9]|postgres)$"']
+    esg_functions.subprocess_pipe_commands(list_dbs_commands)
 
 def postgres_clean_schema_migration():
     pass
