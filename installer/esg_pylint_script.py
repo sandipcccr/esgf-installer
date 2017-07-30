@@ -1,11 +1,12 @@
 #!/usr/local/bin/python2.7
 
 import glob
+import sys
 import os
 import datetime
 import time
 from pylint.lint import Run
-import pprint
+from contextlib import contextmanager
 import esg_bash2py
 import esg_logging_manager
 
@@ -16,6 +17,20 @@ esg_bash2py.mkdir_p("pylint_score_reports")
 
 # get all files that contain the esg*_**.py pattern
 esgf_python_scripts = glob.glob("esg*_**.py")
+
+#TODO: Might do this set difference operation to remove this script (esg_pylint_script) from the linting
+# esgf_python_scripts = set(esgf_python_scripts) - set(glob("esg_pylint_script"))
+
+@contextmanager
+def suppress_stdout():
+    '''Source: http://thesmithfam.org/blog/2012/10/25/temporarily-suppress-console-output-in-python/'''
+    with open(os.devnull, "w") as devnull:
+        old_stdout = sys.stdout
+        sys.stdout = devnull
+        try:
+            yield
+        finally:
+            sys.stdout = old_stdout
 
 
 def usage():
@@ -28,34 +43,36 @@ def scan_all():
     with open("pylint_score_reports/pylint_scores{date}.txt".format(date=time.strftime("%m_%d_%Y")), "a") as scores_file:
         scores_file.write("\n")
         scores_file.write(str(datetime.datetime.today()) + "\n")
-        for script in esgf_python_scripts:
-            print "script name:", script
+        for script_name in esgf_python_scripts:
+            print "script name:", script_name
             scores_file.write(
-                "script name: {script}".format(script=script) + "\n")
-            results = Run([script], exit=False)
+                "script name: {script}".format(script=script_name) + "\n")
+            with suppress_stdout():
+                results = Run([script_name], exit=False)
             try:
                 scores_file.write(
                     "score: " + str(results.linter.stats["global_note"]) + "\n")
             except KeyError, error:
                 logger.error(error)
-                logger.error("Can't find score for %s", script)
+                logger.error("Can't find score for %s", script_name)
 
 
-def scan_one(filename):
+def scan_one(script_name):
     ''' Scan specified python modules and append score to a file with module name.'''
-    with open("pylint_score_reports/pylint_scores_" + filename + "{date}.txt".format(date=time.strftime("%m_%d_%Y")), "a") as scores_file:
+    with open("pylint_score_reports/pylint_scores_" + script_name + "{date}.txt".format(date=time.strftime("%m_%d_%Y")), "a") as scores_file:
         scores_file.write("\n")
         scores_file.write(str(datetime.datetime.today()) + "\n")
-        if filename in esgf_python_scripts:
-            print "script name:", filename
-            scores_file.write("Evaluating: {}".format(filename) + "\n")
-            results = Run([filename], exit=False)
+        if script_name in esgf_python_scripts:
+            print "script name:", script_name
+            scores_file.write("Evaluating: {}".format(script_name) + "\n")
+            with suppress_stdout():
+                results = Run([script_name], exit=False)
             try:
                 scores_file.write(
                     "score: " + str(results.linter.stats["global_note"]) + "\n")
             except KeyError, error:
                 logger.error(error)
-                logger.error("Can't find score for %s", script)
+                logger.error("Can't find score for %s", script_name)
 
 
 def main(argv):
