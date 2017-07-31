@@ -11,23 +11,22 @@ import datetime
 import tarfile
 import requests
 import hashlib
-import logging
 import shlex
 import socket
+import yaml
 from esg_exceptions import UnprivilegedUserError, WrongOSError, UnverifiedScriptError
 from time import sleep
-from esg_init import EsgInit
 import esg_bash2py
 import esg_property_manager
+import esg_logging_manager
 
 
-logging.basicConfig(level=logging.DEBUG)
-logger = logging.getLogger(__name__)
-config = EsgInit()
+logger = esg_logging_manager.create_rotating_log(__name__)
 
+with open('esg_config.yaml', 'r') as config_file:
+    config = yaml.load(config_file)
 
-#TODO: Come up with better function name
-def checked_done(status):
+def exit_with_error(status):
     '''
         if positional parameter at position 1 is non-zero, then print error message.
     '''
@@ -43,10 +42,8 @@ def checked_done(status):
             ""
         )
         #Move back to starting directory
-        os.chdir(config.config_dictionary["install_prefix"])
+        os.chdir(config["install_prefix"])
         sys.exit()
-    else:
-        return 0
 
 #-------------------------------
 # Process checking utility functions
@@ -54,6 +51,7 @@ def checked_done(status):
 
 def check_esgf_httpd_process():
     status = subprocess.check_output(["service", "esgf-httpd", "status"])
+    print "httpd status:", status
     if status:
         return 0
     else:
@@ -130,6 +128,7 @@ def path_unique(path_string = os.environ["PATH"], path_separator=":"):
     split_path = path_string.split(path_separator)
     return ":".join(sorted(set(split_path), key=split_path.index))
 
+#TODO: Maybe move this to esg_bash2py
 def readlinkf(file_name):
     '''
     This is a portable implementation of GNU's "readlink -f" in
@@ -170,7 +169,7 @@ def insert_file_at_pattern(target_file, input_file, pattern):
 
 
 # TODO: Not used anywhere; maybe deprecate
-def append_to_path():
+def append_to_path(path_variable, path_list):
     '''
         Appends path components to a variable, deduplicates the list,
         then prints to stdout the export command required to append that
@@ -193,7 +192,8 @@ def append_to_path():
               NOT WHAT YOU WANT - use prefix_to_path (below)
 
     '''
-    pass
+    for path in path_list:
+        os.environ[path_variable] = os.environ + path
 
 def prefix_to_path(path, prepend_value):
     '''
@@ -222,31 +222,25 @@ def prefix_to_path(path, prepend_value):
     return path_unique(prepend_value)+":"+path
 
 
-def backup(path, backup_dir = config.config_dictionary["esg_backup_dir"], num_of_backups=config.config_dictionary["num_backups_to_keep"]):
+def backup(path, backup_dir = config["esg_backup_dir"], num_of_backups=config["num_backups_to_keep"]):
     '''
         Given a directory the contents of the directory is backed up as a tar.gz file in
-        arg1 - a filesystem path
-        arg2 - destination directory for putting backup archive (default esg_backup_dir:-/esg/backups)
-        arg3 - the number of backup files you wish to have present in destination directory (default num_backups_to_keep:-7)
+        path - a filesystem path
+        backup_dir - destination directory for putting backup archive (default esg_backup_dir:-/esg/backups)
+        num_of_backups - the number of backup files you wish to have present in destination directory (default num_backups_to_keep:-7)
     '''
-    source = readlinkf(path)
-    print "Backup - Creating a backup archive of %s" % (source)
+    source_directory = readlinkf(path)
+    print "Backup - Creating a backup archive of %s" % (source_directory)
     current_directory = os.getcwd()
 
-    os.chdir(source)
-    try:
-        os.mkdir(backup_dir)
-    except OSError, e:
-        if e.errno != 17:
-            raise
-        sleep(1)
-        pass
+    os.chdir(source_directory)
+    esg_bash2py.mkdir_p(source_directory)
 
-    source_backup_name = re.search("\w+$", source).group()
+    source_backup_name = re.search("\w+$", source_directory).group()
     backup_filename=readlinkf(backup_dir)+"/"+source_backup_name + "." + str(datetime.date.today())+".tgz"
     try:
         with tarfile.open(backup_filename, "w:gz") as tar:
-            tar.add(source)
+            tar.add(source_directory)
     except:
         print "ERROR: Problem with creating backup archive: {backup_filename}".format(backup_filename = backup_filename)
         os.chdir(current_directory)
@@ -514,12 +508,14 @@ def _verify_against_mirror(esg_dist_url_root, script_maj_version):
 
 
 
-def stream_subprocess_output(subprocess_object):
-    with subprocess_object.stdout:
-        for line in iter(subprocess_object.stdout.readline, b''):
+def stream_subprocess_output(command_string):
+    ''' Print out the stdout of the subprocess in real time '''
+    process = subprocess.Popen(shlex.split(command_string), stdout=subprocess.PIPE)
+    with process.stdout:
+        for line in iter(process.stdout.readline, b''):
             print line,
     # wait for the subprocess to exit
-    subprocess_object.wait()
+    process.wait()
 
 
 def call_subprocess(command_string, command_stdin = None):
@@ -539,6 +535,8 @@ def call_subprocess(command_string, command_stdin = None):
 def subprocess_pipe_commands(command_list):
     subprocess_list = []
     for index, command in enumerate(command_list):
+        print "index:", index
+        print "command:", command
         if index > 0:
             subprocess_command = subprocess.Popen(command, stdin = subprocess_list[index -1].stdout, stdout=subprocess.PIPE)
             subprocess_list.append(subprocess_command)
@@ -562,18 +560,20 @@ def check_shmmax(min_shmmax = 48):
     kernel_shmmax = esg_property_manager.get_property("kernel_shmmax", 48)
     set_value_mb = min_shmmax
     set_value_bytes = set_value_mb *1024*1024
-    cur_value_bytes = subprocess.check_output("sysctl -q kernel.shmmax | tr -s '='' | cut -d= -f2", stdout=subprocess.PIPE)
+    cur_value_bytes = call_subprocess("sysctl -q kernel.shmmax")["stdout"].split("=")[1]
+    print "cur_value_bytes:", cur_value_bytes
     cur_value_bytes = cur_value_bytes.strip()
 
     if cur_value_bytes < set_value_bytes:
         print "Current system shared mem value too low [{cur_value_bytes} bytes] changing to [{set_value_bytes} bytes]".format(cur_value_bytes = cur_value_bytes, set_value_bytes = set_value_bytes)
-        subprocess.call("sysctl -w kernel.shmmax=${set_value_bytes}".format(set_value_bytes = set_value_bytes))
-        subprocess.call("sed -i.bak 's/\(^[^# ]*[ ]*kernel.shmmax[ ]*=[ ]*\)\(.*\)/\1'${set_value_bytes}'/g' /etc/sysctl.conf")
-        esg_property_manager.add_to_property_file("kernal_shmmax", set_value_mb)
+        call_subprocess("sysctl -w kernel.shmmax={set_value_bytes}".format(set_value_bytes = set_value_bytes))
+        #TODO: replace with Python to update file
+        call_subprocess("sed -i.bak 's/\(^[^# ]*[ ]*kernel.shmmax[ ]*=[ ]*\)\(.*\)/\1'${set_value_bytes}'/g' /etc/sysctl.conf")
+        esg_property_manager.write_as_property("kernal_shmmax", set_value_mb)
 
 def get_esg_root_id():
     try:
-        esg_root_id = config.config_dictionary["esg_root_id"]
+        esg_root_id = config["esg_root_id"]
     except KeyError:
         esg_root_id = esg_property_manager.get_property("esg_root_id")
     return esg_root_id
@@ -581,7 +581,7 @@ def get_esg_root_id():
 def get_esgf_host():
     ''' Get the esgf host name from the file; if not in file, return the fully qualified domain name (FQDN) '''
     try:
-        esgf_host = config.config_dictionary["esgf_host"]
+        esgf_host = config["esgf_host"]
     except KeyError:
         esgf_host = socket.getfqdn()
 
@@ -604,43 +604,43 @@ def set_keyword_password():
 
         keystore_password_input_confirmation = raw_input("Please re-enter the password for this keystore: ")
         if keystore_password_input == keystore_password_input_confirmation:
-            config.config_dictionary["keystore_password"] = keystore_password_input
+            config["keystore_password"] = keystore_password_input
             break
         else:
             print "Sorry, values did not match. Please try again."
             continue
-    with open(config.ks_secret_file, 'w') as keystore_file:
-        keystore_file.write(config.config_dictionary["keystore_password"])
+    with open(config['ks_secret_file'], 'w') as keystore_file:
+        keystore_file.write(config["keystore_password"])
     return True
 
 def get_keystore_password():
     ''' Gets the keystore_password from the saved ks_secret_file '''
     try:
-        with open(config.ks_secret_file, 'rb') as keystore_file:
+        with open(config['ks_secret_file'], 'rb') as keystore_file:
             keystore_password = keystore_file.read().strip()
         if not keystore_password:
             set_keyword_password()
 
-        with open(config.ks_secret_file, 'rb') as keystore_file:
+        with open(config['ks_secret_file'], 'rb') as keystore_file:
             keystore_password = keystore_file.read().strip()
         return keystore_password
     except IOError, error:
         logger.error(error)
         set_keyword_password()
-        with open(config.ks_secret_file, 'rb') as keystore_file:
+        with open(config['ks_secret_file'], 'rb') as keystore_file:
             keystore_password = keystore_file.read().strip()
         return keystore_password
 
 def _check_keystore_password(keystore_password):
     '''Utility function to check that a given password is valid for the global scoped ${keystore_file} '''
-    if not os.path.isfile(config.ks_secret_file):
-        logger.error("$([FAIL]) No keystore file present [%s]", config.ks_secret_file)
+    if not os.path.isfile(config['ks_secret_file']):
+        logger.error("$([FAIL]) No keystore file present [%s]", config['ks_secret_file'])
         return False
     keystore_password = get_keystore_password()
-    keytool_list_command = "{java_install_dir}/bin/keytool -list -keystore {keystore_file} -storepass {keystore_password}".format(java_install_dir=config.config_dictionary["java_install_dir"], keystore_file=config.ks_secret_file, keystore_password=keystore_password)
+    keytool_list_command = "{java_install_dir}/bin/keytool -list -keystore {keystore_file} -storepass {keystore_password}".format(java_install_dir=config["java_install_dir"], keystore_file=config['ks_secret_file'], keystore_password=keystore_password)
     keytool_list_process = call_subprocess(keytool_list_command)
     if keytool_list_process["returncode"] != 0:
-        logger.error("$([FAIL]) Could not access private keystore %s with provided password. Try again...", config.ks_secret_file)
+        logger.error("$([FAIL]) Could not access private keystore %s with provided password. Try again...", config['ks_secret_file'])
         return False
     return True
 
@@ -681,8 +681,7 @@ def verify_esg_node_script(esg_node_filename, esg_dist_url_root, script_version,
                 bootstrap_path = "/usr/local/bin/esg-bootstrap"
             invoke_bootstrap = subprocess.Popen(bootstrap_path, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
             invoke_bootstrap.communicate()
-            # if invoke_bootstrap.returncode == 0:
-            #     esg_functions.checked_get()
+
             print "Please re-run this updated script: {current_script_name}".format(current_script_name = esg_node_filename)
             sys.exit(invoke_bootstrap.returncode)
         elif update_action is "X".lower():

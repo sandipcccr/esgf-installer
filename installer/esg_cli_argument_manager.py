@@ -8,12 +8,14 @@ from time import sleep
 import esg_functions
 import esg_setup
 import esg_apache_manager
-from esg_init import EsgInit
+import esg_logging_manager
+import esg_init
+import yaml
 
-logging.basicConfig(format = "%(levelname): %(lineno)s %(funcName)s", level=logging.DEBUG)
-logger = logging.getLogger(__name__)
+logger = esg_logging_manager.create_rotating_log(__name__)
 
-config = EsgInit()
+with open('esg_config.yaml', 'r') as config_file:
+    config = yaml.load(config_file)
 
 progname = "esg-node"
 script_version = "v2.0-RC5.4.0-devel"
@@ -52,7 +54,7 @@ def start(node_bit):
 def stop(node_bit):
     pass
 def get_node_status():
-    ''' 
+    '''
         Return a tuple with the node's status and a numeric return code
     '''
     pass
@@ -118,7 +120,7 @@ def _define_acceptable_arguments():
     parser.add_argument("--status", help="Status on node's services", action="store_true")
     parser.add_argument("--update-sub-installer", dest="updatesubinstaller", help="Update a specified installation script", nargs=2, metavar=('script_name', 'script_directory'))
     parser.add_argument("--update-apache-conf", dest="updateapacheconf", help="Update Apache configuration", action="store_true")
-    parser.add_argument("--write-env", dest="writeenv", help="Writes the necessary environment variables to file {envfile}".format(envfile = config.envfile), action="store_true")
+    parser.add_argument("--write-env", dest="writeenv", help="Writes the necessary environment variables to file {envfile}".format(envfile = config["envfile"]), action="store_true")
     parser.add_argument("-v","--version", dest="version", help="Displays the version of this script", action="store_true")
     parser.add_argument("--recommended_setup", dest="recommendedsetup", help="Sets esgsetup to use the recommended, minimal setup", action="store_true")
     parser.add_argument("--custom_setup", dest="customsetup", help="Sets esgsetup to use a custom, user-defined setup", action="store_true")
@@ -126,13 +128,13 @@ def _define_acceptable_arguments():
     parser.add_argument("--devel", help="Sets the installation type to the devel build", action="store_true")
     parser.add_argument("--prod", help="Sets the installation type to the production build", action="store_true")
     parser.add_argument("--clear-env-state", dest="clearenvstate", help="Removes the file holding the environment state of last install", action="store_true")
-    
+
     args = parser.parse_args()
     return (args, parser)
 
 
 def get_previous_node_type_config(config_file):
-    ''' 
+    '''
         Helper method for reading the last state of node type config from config dir file "config_type"
         Every successful, explicit call to --type|-t gets recorded in the "config_type" file
         If the configuration type is not explicity set the value is read from this file.
@@ -147,7 +149,7 @@ def get_previous_node_type_config(config_file):
         logger.error(error)
 
     if not node_type_list:
-        print '''ERROR: No node type selected nor available! \n Consult usage with --help flag... look for the \"--type\" flag 
+        print '''ERROR: No node type selected nor available! \n Consult usage with --help flag... look for the \"--type\" flag
         \n(must come BEFORE \"[start|stop|restart|update]\" args)\n\n'''
         sys.exit(1)
 
@@ -184,7 +186,7 @@ def process_arguments(install_mode, upgrade_mode, node_type_list, devel, esg_dis
             #     node_type_bit += get_bit_value("install")
             logger.debug("Install Services")
     if args.update or args.upgrade:
-            installater_mode_dictionary["upgrade_mode"]= True 
+            installater_mode_dictionary["upgrade_mode"]= True
             installater_mode_dictionary["install_mode"] = False
             set_node_type_value("install", node_type_list, True)
             # if node_type_bit & bit_dictionary["INSTALL_BIT"] == 0:
@@ -197,17 +199,17 @@ def process_arguments(install_mode, upgrade_mode, node_type_list, devel, esg_dis
         sys.exit(0)
     if args.installlocalcerts:
         logger.debug("installing local certs")
-        get_previous_node_type_config(config.esg_config_type_file)
+        get_previous_node_type_config(config["esg_config_type_file"])
         install_local_certs()
         sys.exit(0)
     if args.generateesgfcsrs:
         logger.debug("generating esgf csrs")
-        get_previous_node_type_config(config.esg_config_type_file)
+        get_previous_node_type_config(config["esg_config_type_file"])
         generate_esgf_csrs()
         sys.exit(0)
     if args.generateesgfcsrsext:
         logger.debug("generating esgf csrs for other node")
-        get_previous_node_type_config(config.esg_config_type_file)
+        get_previous_node_type_config(config["esg_config_type_file"])
         generate_esgf_csrs_ext()
         sys.exit(0)
     if args.certhowto:
@@ -247,16 +249,16 @@ def process_arguments(install_mode, upgrade_mode, node_type_list, devel, esg_dis
             # if node_type_bit & get_bit_value(arg) == 0:
             #     node_type_bit += get_bit_value(arg)
             #     selection_string += " "+arg
-        if not os.path.isdir(config.esg_config_dir):
+        if not os.path.isdir(config["esg_config_dir"]):
             try:
-                os.mkdir(config.esg_config_dir)
+                os.mkdir(config["esg_config_dir"])
             except IOError, error:
                 logger.error(error)
         # logger.info("node type set to: [%s] (%s) ", selection_string, node_type_bit)
-        set_node_type_config(node_type_list, config.esg_config_type_file)
+        set_node_type_config(node_type_list, config["esg_config_type_file"])
         sys.exit(0)
     elif args.gettype:
-        get_previous_node_type_config(config.esg_config_type_file)
+        get_previous_node_type_config(config["esg_config_type_file"])
         show_type()
         sys.exit(0)
     elif args.start:
@@ -333,7 +335,7 @@ def process_arguments(install_mode, upgrade_mode, node_type_list, devel, esg_dis
         # if check_prerequisites() is not 0:
         #     logger.error("Prerequisites for startup not satisfied.  Exiting.")
         #     sys.exit(1)
-        if os.path.isfile(config.envfile):
-            shutil.move(config.envfile, config.envfile+".bak")
+        if os.path.isfile(config["envfile"]):
+            shutil.move(config["envfile"], config["envfile"]+".bak")
             #empty out contents of the file
-            open(config.envfile, 'w').close()
+            open(config["envfile"], 'w').close()

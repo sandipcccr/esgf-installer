@@ -42,4 +42,4 @@ generated/
 /web/index.html
 /.project
 *.swp
-esg_node_with_conda
+/shell_scripts

@@ -1,20 +1,24 @@
 import sys
 import subprocess
 import logging
-from esg_init import EsgInit
+import yaml
+from plumbum.cmd import grep, wc, cat, head, ifconfig, awk
+import netifaces
 import esg_bash2py
+import esg_logging_manager
 
-logging.basicConfig(level=logging.DEBUG)
-logger = logging.getLogger(__name__)
-config = EsgInit()
+logger = esg_logging_manager.create_rotating_log(__name__)
+
+with open('esg_config.yaml', 'r') as config_file:
+    config = yaml.load(config_file)
 
 #----------------------------------------------------------
 # Environment Management Utility Functions
 #----------------------------------------------------------
 def remove_env(env_name):
-    print "removing %s's environment from %s" % (env_name, config.envfile)
+    print "removing %s's environment from %s" % (env_name, config["envfile"])
     found_in_env_file = False
-    datafile = open(config.envfile, "r+")
+    datafile = open(config["envfile"], "r+")
     searchlines = datafile.readlines()
     datafile.seek(0)
     for line in searchlines:
@@ -28,7 +32,7 @@ def remove_env(env_name):
 
 #TODO: Fix sed statement
 def remove_install_log_entry(entry):
-    print "removing %s's install log entry from %s" % (entry, config.config_dictionary["install_manifest"])
+    print "removing %s's install log entry from %s" % (entry, config["install_manifest"])
     subprocess.check_output("sed -i '/[:]\?'${key}'=/d' ${install_manifest}")
 
 #TODO: This might be redundant with esg_property_manager.deduplicate_properties_file();
@@ -43,7 +47,7 @@ def deduplicate_settings_in_file(envfile = None):
     envfile - The environment file to have duplicate entries removed.
     '''
 
-    infile = esg_bash2py.Expand.colonMinus(envfile, config.envfile)
+    infile = esg_bash2py.Expand.colonMinus(envfile, config["envfile"])
     try:
         my_set = set()
         deduplicated_list = []
@@ -57,23 +61,52 @@ def deduplicate_settings_in_file(envfile = None):
                     deduplicated_list.append(key+ "=" + value)
                     my_set.add(key)
             deduplicated_list.reverse()
-            
+
             environment_file.seek(0)
             for setting in deduplicated_list:
                 environment_file.write(setting)
             environment_file.truncate()
+            return True
     except IOError, error:
         logger.error(error)
         sys.exit(0)
 
 
-#TODO: fix awk statements
-# def get_config_ip(interface_value):
-#     '''
-#     #####
-#     # Get Current IP Address - Needed (at least temporarily) for Mesos Master
-#     ####
-#     Takes a single interface value
-#     "eth0" or "lo", etc...
-#     '''
-    # return subprocess.check_output("ifconfig $1 | grep \"inet[^6]\" | awk '{ gsub (\" *inet [^:]*:\",\"\"); print $1}'")
+def deduplicate_properties(properties_file = None):
+    infile = esg_bash2py.Expand.colonMinus(properties_file, config["config_file"])
+    try:
+        my_set = set()
+        deduplicated_list = []
+        with open(infile, 'r+') as prop_file:
+            property_settings = prop_file.readlines()
+            for prop in reversed(property_settings):
+                if not prop.isspace():
+                    key, value = prop.split("=")
+                    # logger.debug("key: %s", key)
+                    # logger.debug("value: %s", value)
+                if key not in my_set:
+                    deduplicated_list.append(key+ "=" + value)
+                    my_set.add(key)
+            deduplicated_list.reverse()
+            # logger.debug("deduplicated_list: %s", str(deduplicated_list))
+            prop_file.seek(0)
+            for setting in deduplicated_list:
+                prop_file.write(setting)
+            prop_file.truncate()
+        return True
+    except IOError, error:
+        logger.error(error)
+        sys.exit(0)
+
+def get_config_ip(interface_value):
+    chain = ifconfig["eth3"] | grep["inet[^6]"] | awk['{ gsub (" *inet [^:]*:",""); print eth3}']
+    #     '''
+    #     #####
+    #     # Get Current IP Address - Needed (at least temporarily) for Mesos Master
+    #     ####
+    #     Takes a single interface value
+    #     "eth0" or "lo", etc...
+    #     '''
+    netifaces.ifaddresses(interface_value)
+    ip = netifaces.ifaddresses(interface_value)[netifaces.AF_INET][0]['addr']
+    return ip
