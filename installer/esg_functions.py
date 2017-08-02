@@ -692,3 +692,12 @@ def verify_esg_node_script(esg_node_filename, esg_dist_url_root, script_version,
             sys.exit(1)
 
     return True
+
+def replace_string_in_file(file_name, original_string, new_string):
+    with open(file_name, 'r') as file_handle :
+        filedata = file_handle.read()
+    filedata = filedata.replace(original_string, new_string)
+
+    # Write the file out again
+    with open(file_name, 'w') as file_handle:
+        file_handle.write(filedata)
