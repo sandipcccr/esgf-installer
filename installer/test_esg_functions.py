@@ -37,5 +37,18 @@ class test_ESG_Functions(unittest.TestCase):
         output = esg_functions.subprocess_pipe_commands("/bin/ps -elf | grep grep")
         self.assertIsNotNone(output)
 
+    def test_replace_string_in_file(self):
+        with open("test_file.txt", "w") as test_file:
+            test_file.write("pcmdi")
+
+        esg_functions.replace_string_in_file("test_file.txt", "pcmdi", "esgf")
+
+        with open("test_file.txt", "r") as test_file:
+            output = test_file.read()
+            print "output:", output
+        self.assertEqual(output, "esgf")
+
+        os.remove("test_file.txt")
+
 if __name__ == '__main__':
     unittest.main()
