@@ -13,9 +13,13 @@ import grp
 import shlex
 import hashlib
 import urlparse
+import time
+import socket
+from hashlib import sha256
 import glob
 import pwd
 import yaml
+import git
 from time import sleep
 from esg_exceptions import UnprivilegedUserError, WrongOSError, UnverifiedScriptError
 import esg_bash2py
@@ -74,7 +78,7 @@ def init():
     # add_to_property_file node_manager_service_app_home
     node_manager_service_app_home = esg_property_manager.get_property("node_manager_service_app_home", "{tomcat_install_dir}/webapps/{node_manager_app_context_root}".format(
         tomcat_install_dir=config["tomcat_install_dir"], node_manager_app_context_root=node_manager_app_context_root))
-    esg_property_manager.write_as_property(
+    esg_property_manager.add_to_property_file(
         "node_manager_service_app_home", node_manager_service_app_home)
 
     # add_to_property_file node_manager_service_endpoint "http$([ "${node_use_ssl}" = "true" ] && echo "s" || echo "")://${esgf_host}/${node_manager_app_context_root}/node"
@@ -331,9 +335,165 @@ def setup_node_manager(mode="install"):
     esg_functions.exit_with_error(0)
 
 
-def setup_nm_repo():
+def setup_nm_repo(devel):
+    peer_group = esg_functions.call_subprocess("grep node.peer.group /esg/config/esgf.properties")["stdout"].split("=")[1]
+    if peer_group == "esgf-demo":
+        FED_NAME = "demonet"
+    else:
+        FED_NAME = peer_group
+
+    # this can be integrated into the installer
+    node_manager_directory = os.path.join("/", "usr", "local", "esgf-node-manager", "src")
+    with esg_bash2py.pushd(os.path.join("/", "usr", "local")):
+        if not os.path.isdir(node_manager_directory):
+            try:
+                git.Repo.clone_from("https://github.com/ESGF/esgf-node-manager.git", "esgf-node-manager")
+            except git.exc.GitCommandError, error:
+                logger.error(error)
+                logger.error("Git repo already exists.")
+        else:
+            os.environ["GIT_SSL_NO_VERIFY"] = "true"
+            print "os.environ", os.environ
+            esgf_node_manager_repo_local = git.Repo(os.path.join("/", "usr", "local", "esgf-node-manager"))
+            origin = esgf_node_manager_repo_local.remotes.origin
+            origin.pull()
+
+    with esg_bash2py.pushd(node_manager_directory):
+        if devel:
+            esgf_node_manager_repo_local.git.checkout("devel")
+        else:
+            esgf_node_manager_repo_local.git.checkout("master")
+
+        #generate a secret key and apply to the settings
+        secret_key_date = time.strftime("%c")
+        secret_key_hostname = socket.gethostname()
+        secret_key = sha256(socket.gethostname()+ " " + time.strftime("%c")).hexdigest()
+
+        replace_string_in_file('python/server/nodemgr/nodemgr/settings.py', 'changeme1', secret_key)
+
+    shutil.copyfile(os.path.join(node_manager_directory, "scripts", "esgf-nm-ctl"), os.path.join(config["install_prefix"], "esgf-nm-ctl"))
+    shutil.copyfile(os.path.join(node_manager_directory, "scripts", "esgf-nm-func"), os.path.join(config["install_prefix"], "esgf-nm-func"))
+
+    os.chmod(os.path.join(config["install_prefix"], "esgf-nm-ctl"), stat.S_IXUSR)
+    os.chmod(os.path.join(node_manager_directory, "scripts", "esgfnmd"), stat.S_IXUSR)
+
+    esg_functions.call_subprocess("adduser nodemgr")
+    esg_functions.call_subprocess("usermod -a -G tomcat nodemgr")
+    esg_functions.call_subprocess("usermod -a -G apache nodemgr")
+
+    esg_bash2py.mkdir_p("/esg/log")
+    esg_bash2py.mkdir_p("/esg/tasks")
+    esg_bash2py.mkdir_p("/esg/config")
+
+    esg_bash2py.touch("/esg/log/esgf_nm.log")
+    esg_bash2py.touch("/esg/log/esgf_nm_dj.log")
+    esg_bash2py.touch("/esg/log/esgfnmd.out.log")
+    esg_bash2py.touch("/esg/log/esgfnmd.err.log")
+    esg_bash2py.touch("/esg/log/nm.properties")
+    esg_bash2py.touch("/esg/log/registration.xml")
+
+    urllib.urlretrieve("http://aims1.llnl.gov/nm-cfg/timestamp", "/esg/config/timestamp")
+    urllib.urlretrieve("http://aims1.llnl.gov/nm-cfg/FED_NAME/esgf_supernodes_list.json".format(FED_NAME=FED_NAME), "/esg/config/esgf_supernodes_list.json")
+
+    nodemgr_user_id = pwd.getpwnam("nodemgr").pw_uid
+    nodemgf_group_id = grp.getgrnam("nodemgr").gr_gid
+    apache_user_id = pwd.getpwnam("apache").pw_uid
+    apache_group_id = grp.getgrnam("apache").gr_gid
+
+    os.chown("/esg/log/esgf_nm.log", nodemgr_user_id, nodemgf_group_id)
+    os.chown("/esg/log/esgfnmd.out.log", nodemgr_user_id, nodemgf_group_id)
+    os.chown("/esg/log/esgfnmd.err.log", nodemgr_user_id, nodemgf_group_id)
+    os.chown("/esg/config/nm.properties", nodemgr_user_id, apache_group_id)
+    os.chown("/esg/config/registration.xml", nodemgr_user_id, apache_group_id)
+    os.chown("/esg/config/timestamp", nodemgr_user_id, nodemgf_group_id)
+    os.chown("/esg/config/esgf_supernodes_list.json", nodemgr_user_id, nodemgf_group_id)
+    os.chown(os.path.join(node_manager_directory, "scripts", "esgfnmd"), nodemgr_user_id, nodemgf_group_id)
+    os.chown("/esg/log/esgf_nm_dj.log", apache_user_id, apache_group_id)
+    os.chown("/esg/log/django.log", apache_user_id, apache_group_id)
+
+    os.chmod("/esg/tasks", 0777)
+    os.chmod("/esg/config/.esg_pg_pass", stat.S_IRGRP)
+
+    # pushd $NM_DIR/python/server
+    #
+    # fqdn=`grep esgf.host= /esg/config/esgf.properties | cut -d'=' -f 2`
+    # # get python to work
+    # source /usr/local/conda/bin/activate esgf-pub
+    # cmd="python gen_nodemap.py $NM_INIT $fqdn"
+    # echo $cmd
+    # $cmd
+    #
+    # local choice="Y"
+    # read -e -p "Automatic peer with super-node (if you administer one, ensure that it is running) [Y/n] " choice
+    # if [ -z $choice ] ; then
+    #     choice="Y"
+    # fi
+    # choice=$(echo ${choice} | tr 'A-Z' 'a-z')
+    # if [ $choice != "n" ] ; then
+    #     cmd="python ../client/member_node_cmd.py add default 0"
+    #     echo $cmd
+    #     $cmd
+    #
+    # fi
+    # source deactivate
+    #
+    # chmod 755 /esg/config/esgf_nodemgr_map.json
+    # chown nodemgr:apache /esg/config/esgf_nodemgr_map.json
+    #
+    # popd
+    with esg_bash2py.pushd(os.path.join(node_manager_directory, "python", "server")):
+        fqdn = socket.getfqdn()
+
+        # get python to work
+        #Add raw_input askin for super node choice here
+        choice = "y"
+        super_node_input = raw_input("Automatic peer with super-node (if you administer one, ensure that it is running) [Y/n] ") or choice
+        choice = super_node_input.lower()
+        #TODO: pass command to streaming subprocess output
+        command_list = ["choice='y'", "source /usr/local/conda/bin/activate esgf-pub", "echo $CONDA_DEFAULT_ENV", 'cmd="python gen_nodemap.py $NM_INIT `hostname -f`"',  "echo 'cmd:' $cmd", "$cmd", "echo 'choice:' $choice", 'if [ $choice != "n" ] ; then',
+        'cmd="python ../client/member_node_cmd.py add default 0"', "echo $cmd", "$cmd", "fi", "source deactivate"]
+        if_command_list = ["choice='y'", "source /usr/local/conda/bin/activate esgf-pub", 'if [ $choice != "n" ] ; then','cmd="python ../client/member_node_cmd.py add default 0"', "echo cmd: $cmd", "$cmd", "fi"]
+        for command in command_list:
+            esg_functions.stream_subprocess_output(commands)
+        commands = '''
+    source /usr/local/conda/bin/activate esgf-pub
+    echo $CONDA_DEFAULT_ENV
+    cmd="python gen_nodemap.py $NM_INIT `hostname -f`"
+    echo 'cmd:' $cmd
+    $cmd
+
+    echo 'choice:' $choice
+    if [ $choice != "n" ] ; then
+        cmd="python ../client/member_node_cmd.py add default 0"
+        echo $cmd
+        $cmd
+    fi
+    source deactivate
+
+    '''.format(choice=choice)
+
+        esg_functions.stream_subprocess_output(commands)
+        # process = subprocess.Popen('/bin/bash', stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        # out, err = process.communicate(commands)
+
+
+
     pass
 
+def multiple_subprocess(cmds):
+    p = subprocess.Popen('/bin/bash', stdin=subprocess.PIPE,
+             stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    for cmd in cmds:
+        p.stdin.write(cmd + "\n")
+    p.stdin.close()
+    # print p.stdout.read()
+    with p.stdout:
+        for line in iter(p.stdout.readline, b''):
+            print line,
+        for line in iter(p.stderr.readline, b''):
+            print line,
+    # wait for the subprocess to exit
+    p.wait()
 
 def setup_py_pkgs():
     pass
