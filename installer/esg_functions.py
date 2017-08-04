@@ -701,3 +701,13 @@ def replace_string_in_file(file_name, original_string, new_string):
     # Write the file out again
     with open(file_name, 'w') as file_handle:
         file_handle.write(filedata)
+
+
+def set_aside_web_app(app_home):
+    if not config["tomcat_install_dir"] in app_home:
+        print "WARNING: Bad application home directory [{app_home}]".format(app_home=app_home)
+        exit_with_error(1)
+
+    if os.path.isdir(app_home):
+        print "Moving Previous Installation of {app_home}...".format(app_home=esg_bash2py.trim_string_from_head(app_home))
+        shutil.move(app_home, app_home + ".bak")
