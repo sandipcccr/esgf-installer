@@ -332,7 +332,7 @@ def setup_node_manager(mode="install"):
 #    setup_conda_env
     setup_py_pkgs()
 
-    setup_nm_repo()
+    setup_nm_repo(devel)
 
     esg_functions.exit_with_error(0)
 
@@ -416,33 +416,6 @@ def setup_nm_repo(devel):
     os.chmod("/esg/tasks", 0777)
     os.chmod("/esg/config/.esg_pg_pass", stat.S_IRGRP)
 
-    # pushd $NM_DIR/python/server
-    #
-    # fqdn=`grep esgf.host= /esg/config/esgf.properties | cut -d'=' -f 2`
-    # # get python to work
-    # source /usr/local/conda/bin/activate esgf-pub
-    # cmd="python gen_nodemap.py $NM_INIT $fqdn"
-    # echo $cmd
-    # $cmd
-    #
-    # local choice="Y"
-    # read -e -p "Automatic peer with super-node (if you administer one, ensure that it is running) [Y/n] " choice
-    # if [ -z $choice ] ; then
-    #     choice="Y"
-    # fi
-    # choice=$(echo ${choice} | tr 'A-Z' 'a-z')
-    # if [ $choice != "n" ] ; then
-    #     cmd="python ../client/member_node_cmd.py add default 0"
-    #     echo $cmd
-    #     $cmd
-    #
-    # fi
-    # source deactivate
-    #
-    # chmod 755 /esg/config/esgf_nodemgr_map.json
-    # chown nodemgr:apache /esg/config/esgf_nodemgr_map.json
-    #
-    # popd
     with esg_bash2py.pushd(os.path.join(node_manager_directory, "python", "server")):
         fqdn = socket.getfqdn()
 
@@ -451,46 +424,13 @@ def setup_nm_repo(devel):
         choice = "y"
         super_node_input = raw_input("Automatic peer with super-node (if you administer one, ensure that it is running) [Y/n] ") or choice
         choice = super_node_input.lower()
-
-        # if_command_list = ["choice='y'", "source /usr/local/conda/bin/activate esgf-pub", 'if [ $choice != "n" ] ; then','cmd="python ../client/member_node_cmd.py add default 0"', "echo cmd: $cmd", "$cmd", "fi"]
-    #     for command in command_list:
-    #         esg_functions.stream_subprocess_output(commands)
-    #     commands = '''
-    # source /usr/local/conda/bin/activate esgf-pub
-    # echo $CONDA_DEFAULT_ENV
-    # cmd="python gen_nodemap.py $NM_INIT `hostname -f`"
-    # echo 'cmd:' $cmd
-    # $cmd
-    #
-    # echo 'choice:' $choice
-    # if [ $choice != "n" ] ; then
-    #     cmd="python ../client/member_node_cmd.py add default 0"
-    #     echo $cmd
-    #     $cmd
-    # fi
-    # source deactivate
-    #
-    # '''.format(choice=choice)
-    #
-    #     esg_functions.stream_subprocess_output(commands)
-    #     # process = subprocess.Popen('/bin/bash', stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    #     # out, err = process.communicate(commands)
-        #TODO: pass command to streaming subprocess output
-        command_list = ["choice='y'", "source /usr/local/conda/bin/activate esgf-pub", "echo $CONDA_DEFAULT_ENV", 'cmd="python gen_nodemap.py $NM_INIT `hostname -f`"',  "echo 'cmd:' $cmd", "$cmd", "echo 'choice:' $choice", 'if [ $choice != "n" ] ; then',
+        command_list = ["choice={choice}".format(choice=choice), "source /usr/local/conda/bin/activate esgf-pub", "echo $CONDA_DEFAULT_ENV", 'cmd="python gen_nodemap.py $NM_INIT {fqdn}"'.format(fqdn=fqdn),  "echo 'cmd:' $cmd", "$cmd", "echo 'choice:' $choice", 'if [ $choice != "n" ] ; then',
         'cmd="python ../client/member_node_cmd.py add default 0"', "echo $cmd", "$cmd", "fi", "source deactivate"]
         multiple_subprocess(command_list)
 
-        # chmod 755 /esg/config/esgf_nodemgr_map.json
-        # chown nodemgr:apache /esg/config/esgf_nodemgr_map.json
-        #
-        # popd
         os.chmod("/esg/config/esgf_nodemgr_map.json", 0755)
         os.chown("/esg/config/esgf_nodemgr_map.json", nodemgr_user_id, apache_group_id)
 
-
-
-
-    pass
 
 def multiple_subprocess(cmds):
     p = subprocess.Popen('/bin/bash', stdin=subprocess.PIPE,
@@ -606,7 +546,25 @@ def configure_postgress():
     print "*******************************"
     print
 
-    start_postgress()
+    esg_postgres.start_postgres()
+
+#     if [ -z "$(postgres_list_dbs ${node_db_name})" ] ; then
+#     postgres_create_db ${node_db_name} || return 0
+# else
+#     if [ -n "$(postgres_list_db_schemas ${node_db_node_manager_schema_name})" ]; then
+#         echo "Detected an existing node manager schema installation..."
+#     else
+#         postgres_clean_schema_migration "ESGF Node Manager"
+#     fi
+# fi
+
+if node_db_name not in esg_postgres.postgres_list_dbs():
+    esg_postgres.postgres_create_db(node_db_name)
+else:
+    if node_db_node_manager_schema_name in esg_postgres.postgres_list_db_schemas():
+        print "Detected an existing node manager schema installation..."
+    else:
+        postgres_clean_schema_migration("ESGF Node Manager")
 
 
     pass
