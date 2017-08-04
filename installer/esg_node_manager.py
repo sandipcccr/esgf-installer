@@ -14,6 +14,8 @@ import shlex
 import hashlib
 import urlparse
 import time
+import urllib
+import stat
 import socket
 from hashlib import sha256
 import glob
@@ -369,7 +371,7 @@ def setup_nm_repo(devel):
         secret_key_hostname = socket.gethostname()
         secret_key = sha256(socket.gethostname()+ " " + time.strftime("%c")).hexdigest()
 
-        replace_string_in_file('python/server/nodemgr/nodemgr/settings.py', 'changeme1', secret_key)
+        esg_functions.replace_string_in_file('python/server/nodemgr/nodemgr/settings.py', 'changeme1', secret_key)
 
     shutil.copyfile(os.path.join(node_manager_directory, "scripts", "esgf-nm-ctl"), os.path.join(config["install_prefix"], "esgf-nm-ctl"))
     shutil.copyfile(os.path.join(node_manager_directory, "scripts", "esgf-nm-func"), os.path.join(config["install_prefix"], "esgf-nm-func"))
@@ -449,32 +451,42 @@ def setup_nm_repo(devel):
         choice = "y"
         super_node_input = raw_input("Automatic peer with super-node (if you administer one, ensure that it is running) [Y/n] ") or choice
         choice = super_node_input.lower()
+
+        # if_command_list = ["choice='y'", "source /usr/local/conda/bin/activate esgf-pub", 'if [ $choice != "n" ] ; then','cmd="python ../client/member_node_cmd.py add default 0"', "echo cmd: $cmd", "$cmd", "fi"]
+    #     for command in command_list:
+    #         esg_functions.stream_subprocess_output(commands)
+    #     commands = '''
+    # source /usr/local/conda/bin/activate esgf-pub
+    # echo $CONDA_DEFAULT_ENV
+    # cmd="python gen_nodemap.py $NM_INIT `hostname -f`"
+    # echo 'cmd:' $cmd
+    # $cmd
+    #
+    # echo 'choice:' $choice
+    # if [ $choice != "n" ] ; then
+    #     cmd="python ../client/member_node_cmd.py add default 0"
+    #     echo $cmd
+    #     $cmd
+    # fi
+    # source deactivate
+    #
+    # '''.format(choice=choice)
+    #
+    #     esg_functions.stream_subprocess_output(commands)
+    #     # process = subprocess.Popen('/bin/bash', stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    #     # out, err = process.communicate(commands)
         #TODO: pass command to streaming subprocess output
         command_list = ["choice='y'", "source /usr/local/conda/bin/activate esgf-pub", "echo $CONDA_DEFAULT_ENV", 'cmd="python gen_nodemap.py $NM_INIT `hostname -f`"',  "echo 'cmd:' $cmd", "$cmd", "echo 'choice:' $choice", 'if [ $choice != "n" ] ; then',
         'cmd="python ../client/member_node_cmd.py add default 0"', "echo $cmd", "$cmd", "fi", "source deactivate"]
-        if_command_list = ["choice='y'", "source /usr/local/conda/bin/activate esgf-pub", 'if [ $choice != "n" ] ; then','cmd="python ../client/member_node_cmd.py add default 0"', "echo cmd: $cmd", "$cmd", "fi"]
-        for command in command_list:
-            esg_functions.stream_subprocess_output(commands)
-        commands = '''
-    source /usr/local/conda/bin/activate esgf-pub
-    echo $CONDA_DEFAULT_ENV
-    cmd="python gen_nodemap.py $NM_INIT `hostname -f`"
-    echo 'cmd:' $cmd
-    $cmd
+        multiple_subprocess(command_list)
 
-    echo 'choice:' $choice
-    if [ $choice != "n" ] ; then
-        cmd="python ../client/member_node_cmd.py add default 0"
-        echo $cmd
-        $cmd
-    fi
-    source deactivate
+        # chmod 755 /esg/config/esgf_nodemgr_map.json
+        # chown nodemgr:apache /esg/config/esgf_nodemgr_map.json
+        #
+        # popd
+        os.chmod("/esg/config/esgf_nodemgr_map.json", 0755)
+        os.chown("/esg/config/esgf_nodemgr_map.json", nodemgr_user_id, apache_group_id)
 
-    '''.format(choice=choice)
-
-        esg_functions.stream_subprocess_output(commands)
-        # process = subprocess.Popen('/bin/bash', stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        # out, err = process.communicate(commands)
 
 
 
