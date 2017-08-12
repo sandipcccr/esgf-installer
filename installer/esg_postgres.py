@@ -329,8 +329,10 @@ def postgres_list_db_schemas():
     try:
         cur.execute("select schema_name from information_schema.schemata;")
         schemas = cur.fetchall()
-        print "schemas: ", schemas
-        return schemas
+        schema_list = []
+        for i in schemas:
+            schema_list.append(''.join(i))
+        return schema_list
     except Exception, error:
         print "error:", error
 
@@ -354,7 +356,10 @@ def postgres_list_dbs():
     try:
         cur.execute("SELECT datname FROM pg_database;")
         databases = cur.fetchall()
-        return databases
+        database_list = []
+        for i in databases:
+            database_list.append(''.join(i))
+        return database_list
     except Exception, error:
         print "error: ", error
 
