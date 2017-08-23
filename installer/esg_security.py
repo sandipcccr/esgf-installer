@@ -1,8 +1,11 @@
 import os
+import datetime
 import esg_logging_manager
 import esg_version_manager
 import esg_postgres
 import esg_bash2py
+import esg_functions
+import esg_env_manager
 import psycopg2
 import yaml
 
@@ -87,41 +90,68 @@ def setup_security(mode="install"):
     clean_security_webapp_subsystem()
 
 
-def configure_postgress():
+def configure_postgress(IDP_BIT, node_type):
     #TODO: check for IDP_BIT
+    if IDP_BIT:
+        esg_security_variables = init()
 
-    init()
+        esg_postgres.start_postgres()
 
-    esg_postgres.start_postgres()
+        print "*******************************"
+        print "Configuring Postgres... for ESGF Security"
+        print "*******************************"
 
-    print "*******************************"
-    print "Configuring Postgres... for ESGF Security"
-    print "*******************************"
-
-    db_list = esg_postgres.postgres_list_dbs()
-    print "db_list:", db_list
-    if not config["node_db_name"] in db_list:
-        esg_postgres.postgres_create_db(config["node_db_name"])
-    else:
-        schema_list = esg_postgres.postgres_list_db_schemas()
-        if config["node_db_security_schema_name"] in schema_list:
-            print "Detected an existing security schema installation..."
+        db_list = esg_postgres.postgres_list_dbs()
+        print "db_list:", db_list
+        if not config["node_db_name"] in db_list:
+            esg_postgres.postgres_create_db(config["node_db_name"])
         else:
-            esg_postgres.postgres_clean_schema_migration("ESGF Security")
+            schema_list = esg_postgres.postgres_list_db_schemas()
+            if config["node_db_security_schema_name"] in schema_list:
+                print "Detected an existing security schema installation..."
+            else:
+                esg_postgres.postgres_clean_schema_migration("ESGF Security")
 
-    db_directory = os.path.join(config["workdir"], "esgf-security-{esgf_security_version}".format(esgf_security_version=config["esgf_security_version", "db"]))
-    esg_bash2py.mkdir_p(db_directory)
-    with esg_bash2py.pushd(db_directory):
-        #------------------------------------------------------------------------
-        #Based on the node type selection we build the appropriate database tables
-        #------------------------------------------------------------------------
+        db_directory = os.path.join(config["workdir"], "esgf-security-{esgf_security_version}".format(esgf_security_version=config["esgf_security_version", "db"]))
+        esg_bash2py.mkdir_p(db_directory)
+        with esg_bash2py.pushd(db_directory):
+            #------------------------------------------------------------------------
+            #Based on the node type selection we build the appropriate database tables
+            #------------------------------------------------------------------------
 
-        #download the egg file from the distribution server is necessary....
+            #download the egg file from the distribution server is necessary....
+            esgf_security_egg_file_url = "{esg_dist_url}/esgf-security/{esgf_security_egg_file}".format(esg_dist_url=esg_dist_url, esgf_security_egg_file=esgf_security_egg_file)
+            if not esg_functions.download_update(esgf_security_egg_file, esgf_security_egg_file_url):
+                print "Could not dowload {esgf_security_egg_file} from {esgf_security_egg_file_url}".format(esgf_security_egg_file=esgf_security_egg_file, esgf_security_egg_file_url=esgf_security_egg_file_url)
 
+            #install the egg....
+            esg_functions.call_subprocess("bash configure_postgres_esg_security.sh")
 
+            write_security_db_install_log()
+    else:
+        print "This function, configure_postgress(), is not applicable to current node type ({node_type})".format(node_type=node_type)
 
+def write_security_db_install_log():
+    with open(config["install_manifest"], 'a') as manifest_file:
+        manifest_file.write(str(datetime.date.today()) + "python:esgf_security={esgf_security_db_version}".format(esgf_security_db_version=esg_security_variables["esgf_security_db_version"]))
+    esg_env_manager.deduplicate_settings_in_file(config.install_manifest)
 
-    pass
+#******************************************************************
+# SECURITY SETUP
+#******************************************************************
+def security_startup_hook():
+    print "Security Startup Hook: Setup policy and whitelists... "
+    esg_security_variables = init()
+    _setup_policy_files()
+    _setup_static_whitelists()
+    # echo -n "(p) " && _setup_policy_files && echo -n ":-) "
+    # [ $? != 0 ] && echo -n ":-("
+    # echo -n "(w) " && _setup_static_whitelists "ats idp" && echo -n ":-) "
+    # [ $? != 0 ] && echo -n ":-("
+    # echo
+
+def _setup_policy_files():
+
 
 def fetch_user_migration_launcher():
     pass
