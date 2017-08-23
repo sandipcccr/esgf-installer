@@ -34,6 +34,7 @@ import esg_postgres
 import esg_logging_manager
 from esg_tomcat_manager import stop_tomcat
 from urlparse import urljoin
+from setuptools.command import easy_install
 
 logger = esg_logging_manager.create_rotating_log(__name__)
 
@@ -537,7 +538,7 @@ def touch_generated_whitelist_files():
         os.chmod(whitelist_file, 0644)
 
 
-def configure_postgress():
+def configure_postgress(node_db_name):
     init()
 
     print
@@ -548,26 +549,43 @@ def configure_postgress():
 
     esg_postgres.start_postgres()
 
-#     if [ -z "$(postgres_list_dbs ${node_db_name})" ] ; then
-#     postgres_create_db ${node_db_name} || return 0
-# else
-#     if [ -n "$(postgres_list_db_schemas ${node_db_node_manager_schema_name})" ]; then
-#         echo "Detected an existing node manager schema installation..."
-#     else
-#         postgres_clean_schema_migration "ESGF Node Manager"
-#     fi
-# fi
+    #     if [ -z "$(postgres_list_dbs ${node_db_name})" ] ; then
+    #     postgres_create_db ${node_db_name} || return 0
+    # else
+    #     if [ -n "$(postgres_list_db_schemas ${node_db_node_manager_schema_name})" ]; then
+    #         echo "Detected an existing node manager schema installation..."
+    #     else
+    #         postgres_clean_schema_migration "ESGF Node Manager"
+    #     fi
+    # fi
 
-if node_db_name not in esg_postgres.postgres_list_dbs():
-    esg_postgres.postgres_create_db(node_db_name)
-else:
-    if node_db_node_manager_schema_name in esg_postgres.postgres_list_db_schemas():
-        print "Detected an existing node manager schema installation..."
+    if node_db_name not in esg_postgres.postgres_list_dbs():
+        esg_postgres.postgres_create_db(node_db_name)
     else:
-        postgres_clean_schema_migration("ESGF Node Manager")
+        if node_db_node_manager_schema_name in esg_postgres.postgres_list_db_schemas():
+            print "Detected an existing node manager schema installation..."
+        else:
+            postgres_clean_schema_migration("ESGF Node Manager")
 
+    if node_dist_dir:
+        db_workdir = os.path.join(config["workdir"], node_dist_dir, "db")
+    else:
+        db_workdir = os.path.join(config["workdir"], "esgf-node-manager-{esgf_node_manager_version}".format(esgf_node_manager_version=esgf_node_manager_version), "db")
+    with esg_bash2py.pushd(db_workdir):
+        #------------------------------------------------------------------------
+        #Based on the node type selection we build the appropriate database tables
+        #------------------------------------------------------------------------
 
-    pass
+        #download the egg file from the distribution server is necessary....
+        esgf_node_manager_egg_url = "{esg_dist_url}/esgf-node-manager/{esgf_node_manager_egg_file}".format(esg_dist_url=esg_dist_url, esgf_node_manager_egg_file=esgf_node_manager_egg_file)
+        esg_functions.download_update(esgf_node_manager_egg_file, esgf_node_manager_egg_url)
+
+        #install the egg....
+        easy_install.main(["-U", esgf_node_manager_egg_file])
+
+        esg_functions.call_subprocess("bash esg_node_manager_conda_env.sh")
+
+        write_node_manager_db_install_log()
 
 def write_node_manager_db_install_log():
     with open(config.install_manifest, "a") as manifest_file:
